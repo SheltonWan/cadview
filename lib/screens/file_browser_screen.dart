@@ -83,10 +83,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFF555555)),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 14,
+                    ),
+                  ).copyWith(
+                    side: WidgetStateProperty.resolveWith<BorderSide?>(
+                      (states) {
+                        if (states.contains(WidgetState.pressed) ||
+                            states.contains(WidgetState.hovered)) {
+                          return const BorderSide(color: Color(0xFF888888));
+                        }
+                        return const BorderSide(color: Color(0xFF555555));
+                      },
                     ),
                   ),
                   icon: const Icon(Icons.insert_drive_file_outlined),
@@ -231,6 +240,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
         Icons.chevron_right,
         color: Color(0xFF555555),
       ),
+      hoverColor: const Color(0x1A0078D4),
       onTap: () => _openFile(file.path),
     );
   }

@@ -145,7 +145,7 @@ class LocalServer {
     ];
 
     // Version stamp: increment when assetFiles changes to force re-extraction
-    const extractionVersion = 'v2';
+    const extractionVersion = 'v7';
 
     // Re-use cached extraction if marker file exists with matching version
     final marker = File(p.join(viewerDir.path, '.extracted'));
