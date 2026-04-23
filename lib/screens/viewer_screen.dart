@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -32,6 +33,11 @@ class _ViewerScreenState extends State<ViewerScreen> {
   List<HotspotModel>? _pendingHotspots;
   bool _exportingsvg = false;
 
+  /// Watchdog for `listUnitSources` — if Vue doesn't reply within this window
+  /// we show an error instead of leaving the user staring at a silent UI.
+  Timer? _unitSourceWatchdog;
+  bool _scanningUnitSources = false;
+
   // Floor candidate list parsed from the DWG (layouts / block defs / inserts).
   FloorCandidateReport? _floors;
 
@@ -48,6 +54,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
   void initState() {
     super.initState();
     _initViewer();
+  }
+
+  @override
+  void dispose() {
+    _unitSourceWatchdog?.cancel();
+    super.dispose();
   }
 
   Future<void> _initViewer() async {
@@ -133,7 +145,11 @@ class _ViewerScreenState extends State<ViewerScreen> {
           if (mounted) setState(() => _floors = report);
         }
       } else if (type == 'unit_sources_loaded') {
+        _unitSourceWatchdog?.cancel();
         final rawList = data['payload'];
+        if (mounted && _scanningUnitSources) {
+          setState(() => _scanningUnitSources = false);
+        }
         if (rawList is List) {
           final sources = rawList
               .whereType<Map<String, dynamic>>()
@@ -142,7 +158,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
           debugPrint(
             '[Bridge] unit_sources_loaded: ${sources.length} layer(s)',
           );
-          if (mounted) _showUnitSourcePicker(sources);
+          if (!mounted) return;
+          if (sources.isEmpty) {
+            _showSnackBar('当前 CAD 文档未发现任何可识别的图层内容', isError: true);
+          } else {
+            _showUnitSourcePicker(sources);
+          }
         }
       } else if (type == 'units_extracted') {
         final payload = data['payload'];
@@ -182,9 +203,13 @@ class _ViewerScreenState extends State<ViewerScreen> {
         );
         _onSvgReceived(svgContent, unitBounds, viewport);
       } else if (type == 'export_error') {
+        _unitSourceWatchdog?.cancel();
         final msg = data['payload']?.toString() ?? '导出失败';
         if (mounted) {
-          setState(() => _exportingsvg = false);
+          setState(() {
+            _exportingsvg = false;
+            _scanningUnitSources = false;
+          });
           _showSnackBar('SVG 导出错误: $msg', isError: true);
         }
       } else if (type == 'debug') {
@@ -239,8 +264,37 @@ class _ViewerScreenState extends State<ViewerScreen> {
   }
 
   Future<void> _openHotspotEditor() async {
-    // New flow: ask Vue for unit-source candidates, then pick → extract → edit.
-    _runJs('if (window.cadViewer) window.cadViewer.listUnitSources();');
+    if (_scanningUnitSources) return;
+    if (!_viewerReady) {
+      _showSnackBar('CAD 查看器尚未就绪，请稍候再试', isError: true);
+      return;
+    }
+
+    setState(() => _scanningUnitSources = true);
+    _showSnackBar('正在扫描图层…');
+
+    // Watchdog: if Vue never replies with `unit_sources_loaded`, surface the
+    // failure instead of hanging in a "no response" state.
+    _unitSourceWatchdog?.cancel();
+    _unitSourceWatchdog = Timer(const Duration(seconds: 8), () {
+      if (!mounted || !_scanningUnitSources) return;
+      setState(() => _scanningUnitSources = false);
+      _showSnackBar(
+        '图层扫描超时：CAD 文档可能未加载完成，或当前图纸无可识别内容。请重新加载后重试。',
+        isError: true,
+      );
+    });
+
+    debugPrint('[Bridge] calling listUnitSources()…');
+    _runJs(
+      "if (window.cadViewer && window.cadViewer.listUnitSources) { "
+      "  window.cadViewer.listUnitSources(); "
+      "} else { "
+      "  (window.FlutterBridge && window.FlutterBridge.postMessage(JSON.stringify("
+      "    { type: 'export_error', payload: '查看器未就绪：window.cadViewer.listUnitSources 不存在' }"
+      "  ))); "
+      "}",
+    );
   }
 
   /// Present the boundary-layer picker once Vue returns candidates.
@@ -454,7 +508,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             ),
           // Hotspot export button — shown after layers are loaded
           if (_layerList.isNotEmpty)
-            _exportingsvg
+            (_exportingsvg || _scanningUnitSources)
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Center(

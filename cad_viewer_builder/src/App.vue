@@ -355,7 +355,13 @@ function entityBbox(entity: any): UnitBbox | null {
 function sendUnitSourceCandidates() {
   try {
     const doc = AcApDocManager.instance.curDocument
-    if (!doc) return
+    if (!doc) {
+      notifyFlutter({
+        type: 'export_error',
+        payload: '当前没有已加载的 CAD 文档，无法扫描图层',
+      })
+      return
+    }
     const ms = doc.database.tables.blockTable.modelSpace
     const byLayer = new Map<string, LayerStats>()
     const touch = (name: string): LayerStats => {
@@ -395,7 +401,10 @@ function sendUnitSourceCandidates() {
     })
     notifyFlutter({ type: 'unit_sources_loaded', payload: candidates })
   } catch (e: any) {
-    notifyFlutter({ type: 'debug', payload: `sendUnitSourceCandidates error: ${e?.message ?? e}` })
+    notifyFlutter({
+      type: 'export_error',
+      payload: `sendUnitSourceCandidates: ${String(e?.message ?? e)}`,
+    })
   }
 }
 
