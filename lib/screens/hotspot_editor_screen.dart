@@ -262,7 +262,7 @@ class _LayerHotspotTile extends StatelessWidget {
             Switch(
               value: enabled,
               onChanged: onEnabledChanged,
-              activeColor: const Color(0xFF4FC3F7),
+              activeThumbColor: const Color(0xFF4FC3F7),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             const SizedBox(width: 4),

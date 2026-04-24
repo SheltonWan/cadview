@@ -76,7 +76,9 @@ class _UnitEditorScreenState extends State<UnitEditorScreen> {
 
   void _toggleAll(bool value) {
     setState(() {
-      for (final u in _units) u.enabled = value;
+      for (final u in _units) {
+        u.enabled = value;
+      }
     });
   }
 
@@ -140,7 +142,7 @@ class _UnitEditorScreenState extends State<UnitEditorScreen> {
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     itemCount: _units.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const Divider(height: 1, color: Color(0xFF2A2A2A)),
                     itemBuilder: (_, i) {
                       final unit = _units[i];

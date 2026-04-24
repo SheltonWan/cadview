@@ -1,6 +1,7 @@
 /// 热区单元候选：来自 Vue `extractUnits` 返回的一条闭合边界。
 ///
 /// 一个 CAD 图层中每条闭合多段线 / Hatch / 圆就是一个 [UnitCandidate]。
+library;
 import 'package:uuid/uuid.dart';
 
 class UnitBounds {
